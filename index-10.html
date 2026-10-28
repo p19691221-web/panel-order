@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>板件加工單</title>
+<style>
+:root{--bg:#f5f4f0;--fg:#22262a;--muted:#6b7177;--line:#d9d6cf;--card:#fff;--accent:#2f5d50;--warn:#a8650a;--err:#b03a2e;--okbg:#e8f1ec;--warnbg:#fbf1e2;--errbg:#f8e6e3}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#1b1d1f;--fg:#e7e5e0;--muted:#9aa0a6;--line:#383b3f;--card:#24272a;--accent:#7cc1a8;--warn:#e0a24a;--err:#e57a6c;--okbg:#22312b;--warnbg:#3a2f1e;--errbg:#3d2522}}
+:root[data-theme="dark"]{--bg:#1b1d1f;--fg:#e7e5e0;--muted:#9aa0a6;--line:#383b3f;--card:#24272a;--accent:#7cc1a8;--warn:#e0a24a;--err:#e57a6c;--okbg:#22312b;--warnbg:#3a2f1e;--errbg:#3d2522}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Noto Sans TC","PingFang TC",sans-serif;font-size:15px}
+main{max-width:1000px;margin:0 auto;padding:16px 16px 60px}
+h1{font-size:22px;margin:8px 0 2px}
+.sub{color:var(--muted);font-size:13px;margin:0 0 16px}
+section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+h2{font-size:16px;margin:0 0 10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+label{display:flex;flex-direction:column;font-size:12px;color:var(--muted);gap:3px}
+input,select,textarea{font:inherit;font-size:15px;padding:7px 8px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--fg);width:100%}
+button{font:inherit;padding:8px 14px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--fg);cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.small{padding:4px 9px;font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.hint{font-size:12px;color:var(--muted);line-height:1.6}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{border-bottom:1px solid var(--line);padding:5px 4px;text-align:left;white-space:nowrap}
+th{font-size:12px;color:var(--muted);font-weight:600}
+td input,td select{padding:4px 5px;font-size:14px;min-width:54px}
+td input.n{width:72px}
+td input.q{width:52px}
+td input.name{min-width:110px}
+.edges{display:flex;gap:2px}
+.edges label{flex-direction:row;align-items:center;gap:1px;font-size:11px}
+.edges input{width:auto}
+tr.err td{background:var(--errbg)}
+tr.warn td{background:var(--warnbg)}
+.msgs{list-style:none;padding:0;margin:0}
+.msgs li{padding:6px 10px;border-radius:7px;margin-bottom:5px;font-size:14px}
+.msgs .err{background:var(--errbg);color:var(--err)}
+.msgs .warn{background:var(--warnbg);color:var(--warn)}
+.msgs .ok{background:var(--okbg);color:var(--accent)}
+.sheets{display:flex;flex-wrap:wrap;gap:10px}
+.sheet{border:1px solid var(--line);border-radius:8px;padding:6px;background:var(--bg)}
+.sheet svg{display:block;width:220px;height:auto}
+.sheet .cap{font-size:12px;color:var(--muted);margin-top:4px}
+.sum{display:flex;gap:18px;flex-wrap:wrap;font-size:14px;margin-bottom:8px}
+.sum b{font-size:18px}
+/* 列印 */
+#print{display:none}
+@media print{
+  body{background:#fff;color:#000;font-size:11pt}
+  main>*:not(#print){display:none!important}
+  #print{display:block}
+  #print table{font-size:9.5pt}
+  #print th,#print td{border:1px solid #999;padding:3px 4px;white-space:normal}
+  #print .sheet{border:1px solid #999;break-inside:avoid}
+  #print .sign{display:flex;gap:30px;margin-top:20px}
+  #print .sign div{flex:1;border-top:1px solid #000;padding-top:4px;font-size:10pt}
+  @page{margin:12mm}
+}
+</style>
+</head>
+<body>
+<main>
+  <h1>板件加工單</h1>
+  <p class="sub">系統櫃拆單、檢查、排板估算，產出給加工廠的加工單。資料只存在這台裝置。</p>
+
+  <section>
+    <h2>1. 訂單資料</h2>
+    <div class="grid">
+      <label>單號<input id="o-no" readonly></label>
+      <label>店家<input id="o-shop" placeholder="例：○○系統櫃"></label>
+      <label>案名／客戶<input id="o-case" placeholder="例：林宅主臥衣櫃"></label>
+      <label>交期<input id="o-due" type="date"></label>
+    </div>
+    <label style="margin-top:8px">備註<textarea id="o-note" rows="2" placeholder="例：側板封邊用同色 1mm；背板另配"></textarea></label>
+  </section>
+
+  <section>
+    <h2>2. 板材與加工設定</h2>
+    <div class="grid">
+      <label>原板長 (mm)<input id="s-len" type="number" value="2440"></label>
+      <label>原板寬 (mm)<input id="s-wid" type="number" value="1220"></label>
+      <label>鋸路損耗 (mm)<input id="s-kerf" type="number" value="4"></label>
+      <label>修邊 (mm，每邊)<input id="s-trim" type="number" value="10"></label>
+      <label>最小加工尺寸 (mm)<input id="s-min" type="number" value="50"></label>
+    </div>
+    <p class="hint">紋路方向「直紋」表示板件的長度方向必須順著原板長邊，排板時不旋轉。</p>
+  </section>
+
+  <section>
+    <h2>3. 快速拆櫃體（簡易）</h2>
+    <p class="hint">假設：側板包頂底板、背板外釘、門片蓋柱。各家做法不同，拆完請在下方板件表核對修改。</p>
+    <div class="grid">
+      <label>櫃名<input id="c-name" value="衣櫃A"></label>
+      <label>寬 W (mm)<input id="c-w" type="number" value="900"></label>
+      <label>高 H (mm)<input id="c-h" type="number" value="2100"></label>
+      <label>深 D (mm)<input id="c-d" type="number" value="580"></label>
+      <label>櫃體板厚 (mm)<input id="c-t" type="number" value="18"></label>
+      <label>背板厚 (mm，0=無)<input id="c-bt" type="number" value="8"></label>
+      <label>層板數<input id="c-sh" type="number" value="3"></label>
+      <label>門片數 (0=無)<input id="c-dr" type="number" value="2"></label>
+      <label>門縫 (mm)<input id="c-gap" type="number" value="3"></label>
+      <label>櫃體板材<input id="c-mat" value="白橡木紋 塑合板 F2"></label>
+      <label>門片板材<input id="c-dmat" value="白橡木紋 塑合板 F2"></label>
+      <label>背板板材<input id="c-bmat" value="白色 密集板 F2"></label>
+    </div>
+    <div class="row"><button class="primary" id="btn-gen">拆單並加入板件表</button></div>
+  </section>
+
+  <section>
+    <h2>4. 板件表</h2>
+    <div class="tablewrap">
+      <table id="parts">
+        <thead><tr><th>#</th><th>板件名稱</th><th>長 L</th><th>寬 W</th><th>厚</th><th>數量</th><th>板材</th><th>紋路</th><th>封邊（長1 長2 寬1 寬2）</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="row">
+      <button id="btn-add" class="small">＋ 加一列</button>
+      <button id="btn-clear" class="small">清空</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>5. 檢查結果</h2>
+    <ul class="msgs" id="msgs"></ul>
+  </section>
+
+  <section>
+    <h2>6. 排板估算</h2>
+    <div id="nest"></div>
+    <p class="hint">簡易排板（整排擺放），用來估算張數與利用率；實際排板以加工廠軟體為準。</p>
+  </section>
+
+  <section>
+    <div class="row" style="margin-top:0">
+      <button class="primary" id="btn-print">列印／存成 PDF</button>
+      <button id="btn-csv">匯出 CSV（Excel）</button>
+      <button id="btn-save">存成檔案</button>
+      <label style="flex-direction:row;align-items:center;gap:6px;color:var(--fg);font-size:14px"><span style="white-space:nowrap">讀取檔案</span><input type="file" id="btn-load" accept=".json,application/json" style="width:auto"></label>
+      <button id="btn-new">開新訂單</button>
+    </div>
+    <p class="hint">店家「存成檔案」傳給加工廠，加工廠「讀取檔案」就能看到同一份板件表、檢查結果與排板。</p>
+  </section>
+
+  <div id="print"></div>
+</main>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const store = {
+  get(k){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; }catch(e){ return null; } },
+  set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+const ORDER_FIELDS = ["o-no","o-shop","o-case","o-due","o-note"];
+const SET_FIELDS = ["s-len","s-wid","s-kerf","s-trim","s-min"];
+let parts = [];
+
+function newNo(){
+  const d = new Date();
+  return d.getFullYear().toString().slice(2) + String(d.getMonth()+1).padStart(2,"0") + String(d.getDate()).padStart(2,"0") + "-" + Math.random().toString(36).slice(2,6).toUpperCase();
+}
+function num(id){ return parseFloat($(id).value) || 0; }
+function blankPart(){ return { name:"", l:0, w:0, t:18, q:1, mat:"", grain:"直紋", e:[0,0,0,0] }; }
+
+/* ---------- 板件表 ---------- */
+function render(){
+  const tb = document.querySelector("#parts tbody"); tb.innerHTML = "";
+  parts.forEach((p, i) => {
+    const tr = document.createElement("tr"); tr.dataset.i = i;
+    const cell = html => { const td = document.createElement("td"); td.innerHTML = html; tr.appendChild(td); return td; };
+    cell(String(i+1));
+    const inp = (key, cls, type="text") => {
+      const td = document.createElement("td"); const x = document.createElement("input");
+      x.type = type; x.className = cls || ""; x.value = p[key];
+      x.oninput = () => { p[key] = type === "number" ? (parseFloat(x.value) || 0) : x.value; changed(); };
+      td.appendChild(x); tr.appendChild(td);
+    };
+    inp("name","name"); inp("l","n","number"); inp("w","n","number"); inp("t","q","number"); inp("q","q","number"); inp("mat","name");
+    const gtd = document.createElement("td"); const g = document.createElement("select");
+    ["直紋","橫紋","無方向"].forEach(o => { const op = document.createElement("option"); op.textContent = o; op.selected = p.grain === o; g.appendChild(op); });
+    g.onchange = () => { p.grain = g.value; changed(); }; gtd.appendChild(g); tr.appendChild(gtd);
+    const etd = document.createElement("td"); const ed = document.createElement("div"); ed.className = "edges";
+    ["長1","長2","寬1","寬2"].forEach((lab, k) => {
+      const l = document.createElement("label"); const c = document.createElement("input"); c.type = "checkbox"; c.checked = !!p.e[k];
+      c.onchange = () => { p.e[k] = c.checked ? 1 : 0; changed(); };
+      l.append(c, lab); ed.appendChild(l);
+    });
+    etd.appendChild(ed); tr.appendChild(etd);
+    const dtd = document.createElement("td"); const del = document.createElement("button"); del.className = "small"; del.textContent = "✕";
+    del.onclick = () => { parts.splice(i,1); render(); changed(); }; dtd.appendChild(del); tr.appendChild(dtd);
+    tb.appendChild(tr);
+  });
+  markRows();
+}
+$("btn-add").onclick = () => { parts.push(blankPart()); render(); changed(); };
+$("btn-clear").onclick = () => { if (!parts.length || confirm("清空所有板件？")) { parts = []; render(); changed(); } };
+
+/* ---------- 簡易拆櫃 ---------- */
+$("btn-gen").onclick = () => {
+  const n = $("c-name").value.trim() || "櫃", W = num("c-w"), H = num("c-h"), D = num("c-d"), t = num("c-t"),
+        bt = num("c-bt"), sh = Math.max(0, Math.round(num("c-sh"))), dr = Math.max(0, Math.round(num("c-dr"))), gap = num("c-gap");
+  const mat = $("c-mat").value.trim(), dmat = $("c-dmat").value.trim(), bmat = $("c-bmat").value.trim();
+  if (!(W > 0 && H > 0 && D > 0 && t > 0)) { alert("請填寬、高、深與板厚"); return; }
+  const inner = W - 2*t, cd = D - (bt > 0 ? bt : 0);   // 背板外釘時，櫃體深度扣背板厚
+  const add = (name, l, w, th, q, m, grain, e) => parts.push({ name: n + " " + name, l: Math.round(l), w: Math.round(w), t: th, q, mat: m, grain, e });
+  add("側板", H, cd, t, 2, mat, "直紋", [1,0,0,0]);            // 前緣封邊
+  add("頂板", inner, cd, t, 1, mat, "橫紋", [1,0,0,0]);
+  add("底板", inner, cd, t, 1, mat, "橫紋", [1,0,0,0]);
+  if (sh) add("層板", inner - 2, cd - 20, t, sh, mat, "橫紋", [1,0,0,0]);   // 層板退縮
+  if (bt > 0) add("背板", H, W, bt, 1, bmat, "無方向", [0,0,0,0]);
+  if (dr) add("門片", H - 2*gap, (W - gap*(dr+1)) / dr, t, dr, dmat, "直紋", [1,1,1,1]);
+  render(); changed();
+};
+
+/* ---------- 檢查 ---------- */
+function usable(){
+  const L = num("s-len"), Wd = num("s-wid"), trim = num("s-trim");
+  return { L: L - 2*trim, W: Wd - 2*trim };
+}
+function check(){
+  const out = []; const u = usable(); const min = num("s-min");
+  const rowState = parts.map(() => "");
+  const flag = (i, lvl, msg) => { out.push({ lvl, msg: (i >= 0 ? `第 ${i+1} 列「${parts[i].name || "未命名"}」：` : "") + msg });
+    if (i >= 0 && (lvl === "err" || !rowState[i])) rowState[i] = lvl; };
+  if (!parts.length) flag(-1, "warn", "板件表是空的。");
+  if (!$("o-shop").value.trim()) flag(-1, "warn", "未填店家。");
+  if (!$("o-due").value) flag(-1, "warn", "未填交期。");
+  parts.forEach((p, i) => {
+    if (!p.name.trim()) flag(i, "warn", "沒有板件名稱，加工後不易辨識。");
+    if (!(p.l > 0 && p.w > 0)) flag(i, "err", "長或寬未填。");
+    if (!(p.t > 0)) flag(i, "err", "板厚未填。");
+    if (!(p.q >= 1) || p.q !== Math.round(p.q)) flag(i, "err", "數量必須是正整數。");
+    if (!p.mat.trim()) flag(i, "err", "未指定板材，加工廠無法備料。");
+    if (p.l > 0 && p.w > 0) {
+      const fitStraight = p.l <= u.L && p.w <= u.W, fitRot = p.w <= u.L && p.l <= u.W;
+      const fits = p.grain === "無方向" ? (fitStraight || fitRot) : (p.grain === "直紋" ? fitStraight : fitRot);
+      if (!fits) flag(i, "err", `尺寸 ${p.l}×${p.w} 超過原板可用範圍（${u.L}×${u.W}，已扣修邊${p.grain !== "無方向" ? "，且依紋路不能旋轉" : ""}）。`);
+      if (p.l < min || p.w < min) flag(i, "warn", `有一邊小於最小加工尺寸 ${min} mm，請與加工廠確認能否加工。`);
+      if (p.w > p.l) flag(i, "warn", "寬大於長。若長、寬填反，紋路方向會跟著錯。");
+    }
+    if (p.e.some(x => x) && p.t <= 8) flag(i, "warn", `板厚 ${p.t} mm 有勾封邊，請確認薄板能否封邊。`);
+  });
+  // 同名同尺寸重複列
+  const seen = {};
+  parts.forEach((p, i) => { const k = [p.name, p.l, p.w, p.t, p.mat].join("|"); if (seen[k] !== undefined) flag(i, "warn", `與第 ${seen[k]+1} 列完全相同，是否重複輸入？（可合併數量）`); else seen[k] = i; });
+  // 同一板材出現不同厚度
+  const thk = {};
+  parts.forEach(p => { if (p.mat) (thk[p.mat] = thk[p.mat] || new Set()).add(p.t); });
+  Object.entries(thk).forEach(([m, s]) => { if (s.size > 1) flag(-1, "warn", `板材「${m}」出現不同厚度（${[...s].join("、")} mm），請確認是否為不同板材。`); });
+  if (!out.some(x => x.lvl !== "ok") && parts.length) out.push({ lvl: "ok", msg: "沒有發現問題。" });
+  return { out, rowState };
+}
+function markRows(){
+  const { rowState } = check();
+  document.querySelectorAll("#parts tbody tr").forEach((tr, i) => { tr.className = rowState[i] || ""; });
+}
+
+/* ---------- 排板（整排擺放，依高度遞減） ---------- */
+function nest(){
+  const u = usable(), kerf = num("s-kerf");
+  const groups = {};
+  parts.forEach(p => {
+    if (!(p.l > 0 && p.w > 0 && p.q >= 1 && p.mat.trim())) return;
+    const key = p.mat.trim() + "｜" + p.t + "mm";
+    for (let k = 0; k < p.q; k++) (groups[key] = groups[key] || []).push(p);
+  });
+  const result = [];
+  Object.entries(groups).forEach(([key, list]) => {
+    // 決定擺放方向：x 軸 = 原板長邊。直紋：長度沿 x；橫紋：長度沿 y；無方向：取長邊沿 x。
+    const pieces = list.map(p => {
+      let x = p.l, y = p.w;
+      if (p.grain === "橫紋") { x = p.w; y = p.l; }
+      if (p.grain === "無方向" && y > x) { [x, y] = [y, x]; }
+      return { p, x, y, fit: x <= u.L && y <= u.W };
+    }).filter(o => o.fit).sort((a, b) => b.y - a.y || b.x - a.x);
+    const sheets = [];
+    pieces.forEach(o => {
+      let placed = false;
+      for (const s of sheets) {
+        for (const r of s.rows) {
+          if (o.y <= r.h && r.used + o.x <= u.L) { s.items.push({ ...o, px: r.used, py: r.y }); r.used += o.x + kerf; placed = true; break; }
+        }
+        if (placed) break;
+        if (s.top + o.y <= u.W) { const r = { y: s.top, h: o.y, used: o.x + kerf }; s.rows.push(r); s.items.push({ ...o, px: 0, py: s.top }); s.top += o.y + kerf; placed = true; break; }
+      }
+      if (!placed) { const s = { rows: [{ y: 0, h: o.y, used: o.x + kerf }], items: [{ ...o, px: 0, py: 0 }], top: o.y + kerf }; sheets.push(s); }
+    });
+    const area = pieces.reduce((a, o) => a + o.x * o.y, 0);
+    result.push({ key, sheets, count: pieces.length, area, util: sheets.length ? area / (sheets.length * num("s-len") * num("s-wid")) : 0 });
+  });
+  return result;
+}
+function sheetSVG(s, idx, key){
+  const L = num("s-len"), W = num("s-wid"), trim = num("s-trim");
+  const sc = 220 / L, h = W * sc;
+  let g = `<svg viewBox="0 0 220 ${h.toFixed(1)}" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="220" height="${h.toFixed(1)}" fill="none" stroke="currentColor" stroke-width="1"/>`;
+  s.items.forEach(o => {
+    const x = (o.px + trim) * sc, y = (o.py + trim) * sc, w = o.x * sc, hh = o.y * sc;
+    g += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${hh.toFixed(1)}" fill="rgba(47,93,80,.18)" stroke="rgba(47,93,80,.9)" stroke-width=".6"/>`;
+    if (w > 22 && hh > 8) g += `<text x="${(x + 2).toFixed(1)}" y="${(y + 7).toFixed(1)}" font-size="5.5" fill="currentColor">${esc(o.p.name).slice(0, Math.max(2, Math.floor(w / 5.5)))}</text>`;
+  });
+  return `<div class="sheet">${g}</svg><div class="cap">${esc(key)} 第 ${idx + 1} 張・${s.items.length} 片</div></div>`;
+}
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c])); }
+
+/* ---------- 更新畫面 ---------- */
+function changed(){
+  save();
+  markRows();
+  const { out } = check();
+  $("msgs").innerHTML = out.map(m => `<li class="${m.lvl}">${esc(m.msg)}</li>`).join("");
+  const res = nest();
+  if (!res.length) { $("nest").innerHTML = '<p class="hint">板件表填好後會顯示排板估算。</p>'; return; }
+  const totalSheets = res.reduce((a, r) => a + r.sheets.length, 0);
+  $("nest").innerHTML = `<div class="sum"><span>原板合計 <b>${totalSheets}</b> 張</span><span>板件 <b>${res.reduce((a, r) => a + r.count, 0)}</b> 片</span></div>` +
+    res.map(r => `<p style="margin:10px 0 6px"><b>${esc(r.key)}</b>：${r.sheets.length} 張，利用率 ${(r.util * 100).toFixed(0)}%</p><div class="sheets">${r.sheets.map((s, i) => sheetSVG(s, i, r.key)).join("")}</div>`).join("");
+}
+SET_FIELDS.concat(ORDER_FIELDS).forEach(id => $(id).addEventListener("input", changed));
+
+/* ---------- 儲存 / 讀取 ---------- */
+function snapshot(){
+  const o = {}; ORDER_FIELDS.concat(SET_FIELDS).forEach(id => o[id] = $(id).value);
+  return { app: "panel-order", v: 1, fields: o, parts };
+}
+function restore(d){
+  if (!d || d.app !== "panel-order") throw new Error("不是加工單檔案");
+  Object.entries(d.fields || {}).forEach(([k, v]) => { if ($(k)) $(k).value = v; });
+  parts = (d.parts || []).map(p => Object.assign(blankPart(), p, { e: (p.e || [0,0,0,0]).slice(0,4) }));
+  render(); changed();
+}
+function save(){ store.set("po_draft", snapshot()); }
+function download(name, text, type){
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function fileBase(){ return "加工單-" + ($("o-no").value || "未編號"); }
+$("btn-save").onclick = () => download(fileBase() + ".json", JSON.stringify(snapshot(), null, 1), "application/json");
+$("btn-load").onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  f.text().then(t => { try{ restore(JSON.parse(t)); }catch(err){ alert("讀取失敗：" + err.message); } });
+  e.target.value = "";
+};
+$("btn-csv").onclick = () => {
+  const q = v => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+  const rows = [["單號", "店家", "案名", "交期"].map(q).join(","), [$("o-no").value, $("o-shop").value, $("o-case").value, $("o-due").value].map(q).join(","), "",
+    ["#", "板件名稱", "長", "寬", "厚", "數量", "板材", "紋路", "封邊長1", "封邊長2", "封邊寬1", "封邊寬2"].map(q).join(",")];
+  parts.forEach((p, i) => rows.push([i + 1, p.name, p.l, p.w, p.t, p.q, p.mat, p.grain, ...p.e.map(x => x ? "V" : "")].map(q).join(",")));
+  download(fileBase() + ".csv", "﻿" + rows.join("\n"), "text/csv");
+};
+$("btn-new").onclick = () => {
+  if (parts.length && !confirm("開新訂單會清除目前內容（建議先存成檔案）。確定？")) return;
+  ORDER_FIELDS.forEach(id => $(id).value = ""); $("o-no").value = newNo(); parts = []; render(); changed();
+};
+
+/* ---------- 列印 ---------- */
+$("btn-print").onclick = () => {
+  const { out } = check();
+  const errs = out.filter(m => m.lvl === "err");
+  if (errs.length && !confirm(`還有 ${errs.length} 個錯誤未修正，仍要列印嗎？`)) return;
+  const res = nest();
+  const head = `<h2 style="margin:0 0 6px">板件加工單　${esc($("o-no").value)}</h2>
+    <p>店家：${esc($("o-shop").value)}　案名：${esc($("o-case").value)}　交期：${esc($("o-due").value)}</p>
+    ${$("o-note").value ? `<p>備註：${esc($("o-note").value)}</p>` : ""}
+    <p>原板 ${num("s-len")}×${num("s-wid")} mm，鋸路 ${num("s-kerf")} mm，修邊 ${num("s-trim")} mm</p>`;
+  const tbl = `<table><thead><tr><th>#</th><th>板件名稱</th><th>長</th><th>寬</th><th>厚</th><th>數量</th><th>板材</th><th>紋路</th><th>封邊 長1/長2/寬1/寬2</th></tr></thead><tbody>` +
+    parts.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.name)}</td><td>${p.l}</td><td>${p.w}</td><td>${p.t}</td><td>${p.q}</td><td>${esc(p.mat)}</td><td>${p.grain}</td><td>${p.e.map(x => x ? "●" : "○").join(" ")}</td></tr>`).join("") + `</tbody></table>`;
+  const warn = out.filter(m => m.lvl !== "ok").length ? `<p><b>檢查提醒</b></p><ul>${out.filter(m => m.lvl !== "ok").map(m => `<li>${m.lvl === "err" ? "【錯誤】" : "【注意】"}${esc(m.msg)}</li>`).join("")}</ul>` : "";
+  const nestHtml = res.length ? `<p><b>排板估算</b>（簡易估算，以加工廠實際排板為準）：${res.map(r => `${esc(r.key)} ${r.sheets.length} 張`).join("；")}</p><div class="sheets">${res.map(r => r.sheets.map((s, i) => sheetSVG(s, i, r.key)).join("")).join("")}</div>` : "";
+  $("print").innerHTML = head + tbl + warn + nestHtml + `<div class="sign"><div>店家確認（簽名／日期）</div><div>加工廠確認（簽名／日期）</div></div>`;
+  window.print();
+};
+
+/* ---------- 啟動 ---------- */
+const draft = store.get("po_draft");
+if (draft) { try{ restore(draft); }catch(e){ parts = []; } }
+if (!$("o-no").value) $("o-no").value = newNo();
+render(); changed();
+})();
+</script>
+</body>
+</html>
